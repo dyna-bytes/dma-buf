@@ -1,10 +1,11 @@
+#include <linux/platform_device.h>
 #include <linux/dma-buf.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include "exporter.h"
 
+static struct platform_device *exporter_device;
 struct dma_buf *dmabuf_exported;
-struct device *dev; //TODO: set device
 EXPORT_SYMBOL(dmabuf_exported);
 
 static int exporter_attach(
@@ -12,7 +13,7 @@ static int exporter_attach(
     struct dma_buf_attachment *attachment
 )
 {
-    pr_info("[%s] dmabuf attach device: %s\n", __func__, dev_name(attachment->dev));
+    PR_INFO("dmabuf attach device: %s\n", dev_name(attachment->dev));
     return 0;
 }
 
@@ -21,7 +22,7 @@ static void exporter_detach(
     struct dma_buf_attachment *attachment
 )
 {
-    pr_info("[%s] dmabuf detach device: %s\n", __func__, dev_name(attachment->dev));
+    PR_INFO("dmabuf detach device: %s\n", dev_name(attachment->dev));
 }
 
 static struct sg_table *exporter_map_dma_buf(
@@ -33,7 +34,7 @@ static struct sg_table *exporter_map_dma_buf(
     void *vaddr = attachment->dmabuf->priv;
     int err;
 
-    pr_info("[%s] start\n", __func__);
+    PR_INFO("start\n");
     table = kmalloc(sizeof(*table), GFP_KERNEL);
     if (!table)
         return ERR_PTR(-ENOMEM);
@@ -45,8 +46,9 @@ static struct sg_table *exporter_map_dma_buf(
     }
 
     sg_dma_len(table->sgl) = PAGE_SIZE;
-    sg_dma_address(table->sgl) = dma_map_single(dev, vaddr, PAGE_SIZE, dir);
-    pr_info("[%s] end\n", __func__);
+    sg_dma_address(table->sgl) = dma_map_single(&exporter_device->dev,
+            vaddr, PAGE_SIZE, dir);
+    PR_INFO("end\n");
 
     return table;
 }
@@ -57,7 +59,8 @@ static void exporter_unmap_dma_buf(
     enum dma_data_direction dir
 )
 {
-    dma_unmap_single(dev, sg_dma_address(table->sgl), PAGE_SIZE, dir);
+    dma_unmap_single(&exporter_device->dev,
+            sg_dma_address(table->sgl), PAGE_SIZE, dir);
     sg_free_table(table);
     kfree(table);
 }
@@ -73,9 +76,9 @@ static int exporter_vmap(
     struct dma_buf *dmabuf,
     struct iosys_map *map)
 {
-    pr_info("[%s] start\n", __func__);
+    PR_INFO("start\n");
     iosys_map_set_vaddr(map, dmabuf->priv);
-    pr_info("[%s] end\n", __func__);
+    PR_INFO("end\n");
 	return 0;
 }
 
@@ -134,23 +137,38 @@ static struct dma_buf *exporter_alloc_page(void)
 
 static int __init exporter_init(void)
 {
-    pr_info("[%s] start\n", __func__);
+    PR_INFO("start\n");
+
+    exporter_device = platform_device_alloc("exporter_device", -1);
+    if (!exporter_device) {
+        PR_ERR("failed to allocate platform device\n");
+        return -ENOMEM;
+    }
+
+    if (platform_device_add(exporter_device)) {
+        PR_ERR("failed to add platform device\n");
+        platform_device_put(exporter_device);
+        return -EINVAL;
+    }
+
+    PR_INFO("Platform device created successfully\n");
 
     dmabuf_exported = exporter_alloc_page();
 	if (!dmabuf_exported) {
-		pr_err("error: exporter alloc page failed\n");
+		PR_ERR("exporter alloc page failed\n");
 		return -ENOMEM;
 	}
 
-    pr_info("[%s] end\n", __func__);
+    PR_INFO("end\n");
 
     return 0;
 }
 
 static void __exit exporter_exit(void)
 {
-    pr_info("[%s] start\n", __func__);
-    pr_info("[%s] end\n", __func__);
+    PR_INFO("start\n");
+    platform_device_unregister(exporter_device);
+    PR_INFO("end\n");
 }
 
 module_init(exporter_init);
