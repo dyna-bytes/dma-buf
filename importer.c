@@ -1,7 +1,10 @@
 #include <linux/dma-buf.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <kunit/test.h>
 #include "importer.h"
+
+extern struct dma_buf *dmabuf_exported;
 
 static int importer_test_sg(struct dma_buf *dmabuf)
 {
@@ -58,11 +61,39 @@ static int importer_test_vmap(struct dma_buf *dmabuf)
     return 0;
 }
 
+static void kunit_importer_test_sg(struct kunit *test)
+{
+	KUNIT_EXPECT_EQ(test, importer_test_sg(dmabuf_exported), 0);
+}
+
+static void kunit_importer_test_vmap(struct kunit *test)
+{
+	KUNIT_EXPECT_EQ(test, importer_test_vmap(dmabuf_exported), 0);
+}
+
+static struct kunit_case kunit_importer_test_cases[] = {
+	KUNIT_CASE(kunit_importer_test_sg),
+	KUNIT_CASE(kunit_importer_test_vmap),
+	{},
+};
+
+static struct kunit_suite kunit_importer_test_suite = {
+	.name = "kunit_importer_test",
+	.test_cases = kunit_importer_test_cases,
+};
+
 static int __init importer_init(void)
 {
+	int ret;
+
 	PR_INFO("start\n");
-	importer_test_sg(dmabuf_exported);
-	importer_test_vmap(dmabuf_exported);
+
+	ret = kunit_run_tests(&kunit_importer_test_suite);
+	if (ret)
+		PR_ERR("Kunit tests failed: %d\n", ret);
+	else
+		PR_INFO("Kunit tests passed\n");
+
 	PR_INFO("end\n");
 	return 0;
 }
