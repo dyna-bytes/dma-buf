@@ -22,7 +22,7 @@ void run_unit_tests(struct unit_suite *suite) {
     struct unit_case *test_case;
     unsigned int total = 0, passed = 0;
     for (test_case = suite->test_cases; test_case->run_case; test_case++, total++) {
-		if (test_case->run_case(NULL) == true)
+	if (test_case->run_case(NULL) == true)
             printf("Passed %s\n", test_case->name), passed++;
         else
             printf("Failed %s\n", test_case->name);
