@@ -105,3 +105,10 @@ User space에서 dma-buf의 physical memory에 액세스 할 수 있는 두 가�
 
  * 예제 1: DMA-BUF의 fd를 사용하여 mmap() 작업 수행
  * 예제 2: exporter driver의 fd를 사용하여 mmap() 조작 수행
+
+## 예제 1
+dmabuf_exported의 fd를 user에게 전달하고, user가 직접 dmabuf_exported를 다룰 수 있도록 한다.
+유저가 dmabuf_exported의 fd로 mmap()을 수행하면, dmabuf_exported의 dma_buf_ops인 exporter_mmap()이 call된다.
+
+## 에제 2
+dma-buf API인 `dma_buf_mmap()`을 사용하여 character device (exporter)의 mmap() file_operations 요청을 대응한다.

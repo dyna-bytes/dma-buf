@@ -145,9 +145,18 @@ static struct dma_buf *exporter_alloc_page(void)
 	return dmabuf;
 }
 
-static long exporter_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+static long exporter_ioctl(
+    struct file *file, unsigned int cmd, unsigned long arg)
 {
     int fd = dma_buf_fd(dmabuf_exported, O_CLOEXEC);
+
+    /*
+    * Send dmabuf_exported's fd to user, and
+    * let the user to handle dmabuf_exported.
+    * if user does mmap to the fd,
+    * exporter_mmap() of dma_buf_ops will be called.
+    */
+
     if (copy_to_user((int __user *)arg, &fd, sizeof(fd))) {
         print_err("faild to send fd to user\n");
         return -EINVAL;
@@ -156,9 +165,21 @@ static long exporter_ioctl(struct file *filp, unsigned int cmd, unsigned long ar
     return 0;
 }
 
+static int exporter_device_mmap(struct file *file,
+    struct vm_area_struct *vma)
+{
+    /*
+    * Use dma-buf API `dma_buf_mmap()`
+    * to handle mmap() request of
+    * character device's file_operations.
+    */
+    return dma_buf_mmap(dmabuf_exported, vma, 0);
+}
+
 static struct file_operations exporter_fops = {
     .owner = THIS_MODULE,
     .unlocked_ioctl = exporter_ioctl,
+    .mmap = exporter_device_mmap,
 };
 
 static int __init exporter_init(void)
