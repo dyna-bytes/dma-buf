@@ -94,3 +94,14 @@ device->dma_params 매개 변수를 설정하여 DMA 하드웨어의 어드레�
 
 또한 먼저 dma_buf_export 단계에서 메모리를 할당한 다음, 첫 번째 map attachment 단계에서 모든 장치의 기능을 dma_buf->attachments 연결 목록과 비교하고
 조건이 충족되면 sg_table을 반환하는 또 다른 전략이 있다. 조건이 충족되지 않으면 모든 장치 요구 사항을 충족하는 실제 메모리가 다시 할당되고 새 sg_table로 반환된다.
+
+# mmap
+dma_buf_ops에서 제공하는 mmap 콜백 인터페이스 외에도 dma-buf는 다른 device driver에서 dma-buf의 mmap 구현을 직접 참조할 수 있도록 하는 커널 API를 제공한다. 이 API를 통해 device 기반 mmap 파일 작업 인터페이스를 간접적으로 구현할 수 있다.
+
+
+![alt text](images/mmap.png)
+
+User space에서 dma-buf의 physical memory에 액세스 할 수 있는 두 가지 방법을 보여주는 예제를 살펴보자.
+
+ * 예제 1: DMA-BUF의 fd를 사용하여 mmap() 작업 수행
+ * 예제 2: exporter driver의 fd를 사용하여 mmap() 조작 수행

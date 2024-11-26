@@ -24,19 +24,19 @@ static int importer_test_sg(struct dma_buf *dmabuf)
 
 	attachment = dma_buf_attach(dmabuf, dev);
 	if (IS_ERR(attachment)) {
-		PR_ERR("dma_buf_attach() failed\n");
+		print_err("dma_buf_attach() failed\n");
 		return PTR_ERR(attachment);
 	}
 
 	table = dma_buf_map_attachment(attachment, DMA_BIDIRECTIONAL);
 	if (IS_ERR(table)) {
-		PR_ERR("dma_buf_map_attachment() failed\n");
+		print_err("dma_buf_map_attachment() failed\n");
 		dma_buf_detach(dmabuf, attachment);
 	}
 
 	reg_addr = sg_dma_address(table->sgl);
 	reg_size = sg_dma_len(table->sgl);
-	PR_INFO("reg_addr = 0x%08x, reg_size = 0x%08x\n", reg_addr, reg_size);
+	print_info("reg_addr = 0x%08x, reg_size = 0x%08x\n", reg_addr, reg_size);
 
 	dma_buf_unmap_attachment(attachment, table, DMA_BIDIRECTIONAL);
 	dma_buf_detach(dmabuf, attachment);
@@ -50,12 +50,12 @@ static int importer_test_vmap(struct dma_buf *dmabuf)
 	struct iosys_map map;
 
 	if (!dmabuf) {
-		PR_ERR("dmabuf_exported is null\n");
+		print_err("dmabuf_exported is null\n");
 		return -EINVAL;
 	}
 
 	dma_buf_vmap(dmabuf, &map);
-	PR_INFO("read from dmabuf vmap: %s\n", (char *)map.vaddr);
+	print_info("read from dmabuf vmap: %s\n", (char *)map.vaddr);
 	dma_buf_vunmap(dmabuf, &map);
 
     return 0;
@@ -86,22 +86,22 @@ static int __init importer_init(void)
 {
 	int ret;
 
-	PR_INFO("start\n");
+	print_info("start\n");
 
 	ret = kunit_run_tests(&kunit_importer_test_suite);
 	if (ret)
-		PR_ERR("Kunit tests failed: %d\n", ret);
+		print_err("Kunit tests failed: %d\n", ret);
 	else
-		PR_INFO("Kunit tests passed\n");
+		print_info("Kunit tests passed\n");
 
-	PR_INFO("end\n");
+	print_info("end\n");
 	return 0;
 }
 
 static void __exit importer_exit(void)
 {
-	PR_INFO("start\n");
-	PR_INFO("end\n");
+	print_info("start\n");
+	print_info("end\n");
 }
 
 module_init(importer_init);
