@@ -8,8 +8,9 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include "dmabuf_test.h"
 
-int dmabuf_test_ioctl() {
+static int dmabuf_test_ioctl(void) {
 	int exporter_fd;
 	int dmabuf_exported_fd = 0;
 
@@ -34,7 +35,7 @@ int dmabuf_test_ioctl() {
 	return 0;
 }
 
-int dmabuf_test_mmap() {
+static int dmabuf_test_mmap(void) {
 	int exporter_fd;
 
 	exporter_fd = open("/dev/exporter", O_RDONLY);
@@ -55,10 +56,28 @@ int dmabuf_test_mmap() {
 	return 0;
 }
 
+static int unit_dmabuf_test_ioctl(void *data) {
+	return EXPECT_EQ(dmabuf_test_ioctl(), 0);
+}
+
+static int unit_dmabuf_test_mmap(void *data) {
+	return EXPECT_EQ(dmabuf_test_mmap(), 0);
+}
+
+static struct unit_case unit_test_cases[] = {
+	UNIT_CASE(unit_dmabuf_test_ioctl),
+	UNIT_CASE(unit_dmabuf_test_mmap),
+	{},
+};
+
+static struct unit_suite unit_test_suite = {
+	.name = "dmabuf user unit test",
+	.test_cases = unit_test_cases,
+};
+
 int main(int argc, char *argv[])
 {
-	dmabuf_test_ioctl();
-	dmabuf_test_mmap();
+	run_unit_tests(&unit_test_suite);
 
 	return 0;
 }

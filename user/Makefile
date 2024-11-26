@@ -3,7 +3,7 @@ TARGET = dmabuf_test
 
 # 컴파일러 및 플래그
 CC = gcc
-CFLAGS = -Wall -O2
+CFLAGS = -Wall -O2 -I$(PWD)
 
 # 기본 빌드 타겟
 all: $(TARGET)
