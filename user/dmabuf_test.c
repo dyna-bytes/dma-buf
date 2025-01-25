@@ -10,54 +10,75 @@
 #include <sys/mman.h>
 #include "dmabuf_test.h"
 
-static int dmabuf_test_ioctl(void) {
-	int exporter_fd;
-	int dmabuf_exported_fd = 0;
+static int dmabuf_test_exporter_ioctl(void) {
+	int fd;
+	int dmabuf_fd = 0;
 
-	exporter_fd = open("/dev/exporter", O_RDONLY);
-	if (exporter_fd < 0) {
+	fd = open("/dev/exporter", O_RDONLY);
+	if (fd < 0) {
 		printf("open /dev/exporter failed, %s\n", strerror(errno));
 		return -1;
 	}
 
-	ioctl(exporter_fd, 0, &dmabuf_exported_fd);
-	close(exporter_fd);
+	ioctl(fd, 0, &dmabuf_fd);
+	close(fd);
 
-	char *str = mmap(NULL, 4096, PROT_READ, MAP_SHARED, dmabuf_exported_fd, 0);
+	char *str = mmap(NULL, 4096, PROT_READ, MAP_SHARED, dmabuf_fd, 0);
 	if (str == MAP_FAILED) {
 		printf("mmap dmabuf failed: %s\n", strerror(errno));
 		return -errno;
 	}
 
 	printf("read from dmabuf mmap: %s\n", str);
-	close(dmabuf_exported_fd);
+	munmap(str, 4096);
+	close(dmabuf_fd);
+
+	return 0;
+}
+
+static int dmabuf_test_importer_ioctl(void) {
+	int fd;
+	int dmabuf_fd = 0;
+
+	fd = open("/dev/exporter", O_RDONLY);
+	ioctl(fd, 0, &dmabuf_fd);
+	close(fd);
+
+	fd = open("/dev/importer", O_RDONLY);
+	ioctl(fd, 0, &dmabuf_fd);
+	close(fd);
 
 	return 0;
 }
 
 static int dmabuf_test_mmap(void) {
-	int exporter_fd;
+	int fd;
 
-	exporter_fd = open("/dev/exporter", O_RDONLY);
-	if (exporter_fd < 0) {
+	fd = open("/dev/exporter", O_RDONLY);
+	if (fd < 0) {
 		printf("open /dev/exporter failed, %s\n", strerror(errno));
 		return -1;
 	}
 
-	char *str = mmap(NULL, 4096, PROT_READ, MAP_SHARED, exporter_fd, 0);
+	char *str = mmap(NULL, 4096, PROT_READ, MAP_SHARED, fd, 0);
 	if (str == MAP_FAILED) {
 		printf("mmap /dev/exporter failed: %s\n", strerror(errno));
 		return -errno;
 	}
 
 	printf("read from /dev/exporter mmap: %s\n", str);
-	close(exporter_fd);
+	munmap(str, 4096);
+	close(fd);
 
 	return 0;
 }
 
-static int unit_dmabuf_test_ioctl(void *data) {
-	return EXPECT_EQ(dmabuf_test_ioctl(), 0);
+static int unit_dmabuf_test_exporter_ioctl(void *data) {
+	return EXPECT_EQ(dmabuf_test_exporter_ioctl(), 0);
+}
+
+static int unit_dmabuf_test_importer_ioctl(void *data) {
+	return EXPECT_EQ(dmabuf_test_importer_ioctl(), 0);
 }
 
 static int unit_dmabuf_test_mmap(void *data) {
@@ -65,7 +86,8 @@ static int unit_dmabuf_test_mmap(void *data) {
 }
 
 static struct unit_case unit_test_cases[] = {
-	UNIT_CASE(unit_dmabuf_test_ioctl),
+	UNIT_CASE(unit_dmabuf_test_exporter_ioctl),
+	UNIT_CASE(unit_dmabuf_test_importer_ioctl),
 	UNIT_CASE(unit_dmabuf_test_mmap),
 	{},
 };

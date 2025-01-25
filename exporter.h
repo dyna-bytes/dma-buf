@@ -1,8 +1,8 @@
 #ifndef __EXPORTER_H__
 #define __EXPORTER_H__
 
-#define DEVICE_NAME "exporter"
-#define CLASS_NAME "exporter_class"
+#define DEVICE_EXPORTER_NAME "exporter"
+#define CLASS_EXPORTER_NAME "exporter_class"
 
 #define print_info(fmt, ...) \
     pr_info("[INFO][%s](%d)\t" fmt, __func__, __LINE__, ##__VA_ARGS__)

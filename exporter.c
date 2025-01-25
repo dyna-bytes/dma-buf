@@ -79,6 +79,7 @@ static void exporter_release(
 )
 {
     kfree(dmabuf->priv);
+    dmabuf_exported = NULL;
 }
 
 static int exporter_vmap(
@@ -148,7 +149,8 @@ static struct dma_buf *exporter_alloc_page(void)
 static long exporter_ioctl(
     struct file *file, unsigned int cmd, unsigned long arg)
 {
-    int fd = dma_buf_fd(dmabuf_exported, O_CLOEXEC);
+    struct dma_buf *dmabuf = exporter_alloc_page();
+    int fd = dma_buf_fd(dmabuf, O_CLOEXEC);
 
     /*
     * Send dmabuf_exported's fd to user, and
@@ -173,7 +175,8 @@ static int exporter_device_mmap(struct file *file,
     * to handle mmap() request of
     * character device's file_operations.
     */
-    return dma_buf_mmap(dmabuf_exported, vma, 0);
+    struct dma_buf *dmabuf = exporter_alloc_page();
+    return dma_buf_mmap(dmabuf, vma, 0);
 }
 
 static struct file_operations exporter_fops = {
@@ -187,20 +190,22 @@ static int __init exporter_init(void)
     int ret;
     print_info("start\n");
 
-    pdev = platform_device_alloc(DEVICE_NAME, -1);
+    pdev = platform_device_alloc(DEVICE_EXPORTER_NAME, -1);
     if (!pdev) {
         ret = -ENOMEM;
         print_err("failed to allocate platform device(%d)\n", ret);
         goto err;
     }
 
-    if (ret = platform_device_add(pdev)) {
+    ret = platform_device_add(pdev);
+    if (ret) {
         print_err("failed to add platform device(%d)\n", ret);
         goto err2;
     }
     print_info("Platform device created successfully\n");
 
-    if (ret = alloc_chrdev_region(&dev_number, 0, 1, DEVICE_NAME)) {
+    ret = alloc_chrdev_region(&dev_number, 0, 1, DEVICE_EXPORTER_NAME);
+    if (ret) {
         print_err("failed to allocate character device region(%d)\n", ret);
         goto err2;
     }
@@ -208,21 +213,22 @@ static int __init exporter_init(void)
     cdev_init(&cdev, &exporter_fops);
     cdev.owner = THIS_MODULE;
 
-    if (ret = cdev_add(&cdev, dev_number, 1)) {
+    ret = cdev_add(&cdev, dev_number, 1);
+    if (ret) {
         print_err("filed to add character device\n");
         goto err3;
     }
     print_info("Kernel module inserted successfully. Major = %d Minor = %d\n",
         MAJOR(dev_number), MINOR(dev_number));
 
-    dev_class = class_create(THIS_MODULE, CLASS_NAME);
+    dev_class = class_create(THIS_MODULE, CLASS_EXPORTER_NAME);
     if (IS_ERR(dev_class)) {
         ret = PTR_ERR(dev_class);
         print_err("Failed to create device class(%d)\n", ret);
         goto err4;
     }
 
-    if (device_create(dev_class, NULL, dev_number, NULL, DEVICE_NAME) == NULL) {
+    if (device_create(dev_class, NULL, dev_number, NULL, DEVICE_EXPORTER_NAME) == NULL) {
         ret = -ENODEV;
         print_err("Failed to create device(%d)\n", ret);
         goto err5;
@@ -254,6 +260,9 @@ err:
 static void __exit exporter_exit(void)
 {
     print_info("start\n");
+    if (dmabuf_exported)
+        kfree(dmabuf_exported->priv);
+
     device_destroy(dev_class, dev_number);
     class_destroy(dev_class);
     cdev_del(&cdev);

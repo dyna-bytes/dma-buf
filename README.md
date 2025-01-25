@@ -112,3 +112,38 @@ dmabuf_exported의 fd를 user에게 전달하고, user가 직접 dmabuf_exported
 
 ## 에제 2
 dma-buf API인 `dma_buf_mmap()`을 사용하여 character device (exporter)의 mmap() file_operations 요청을 대응한다.
+
+# File
+File과 관련된 인터페이스와 주의사항
+
+dma-buf는 본질적으로 버퍼와 파일의 조합이므로, dma-buf를 쓰는 것은 파일을 open하여 사용하는 것이다.
+dma_buf_export()를 호출하는 순간부터 파일은 open 된다.
+또한 파일은 여전히 **익명 파일** 이므로 애플리케이션은 `fd = open("name")` 으로 해당 FD를 가져올 수는 없으며, 이전 예제 1과 같이 dma_buf_fd()를 통해 get/put 기반 ioctl 인터페이스에만 의존할 수 있다.
+
+## interface
+ * `dma_buf_fd()` : dma-buf -> 새로운 fd
+ * `dma_buf_get()` : fd -> dma-buf
+
+## get/put
+파일마다 내부에 참조 횟수(f_count)가 있다. dma_buf_export() 함수를 사용하여 dma-buf를 생성할 때 참조 횟수 는 1로 초기화된다.
+이 참조 횟수가 0이면 dma_buf_ops의 release 콜백 인터페이스가 자동으로 트리거되고 dma-buf 객체가 해제된다.
+
+리눅스 커널에서 파일 참조 카운팅을 조작하는 가장 일반적인 함수는 dma-buf에 의해 캡슐화된 fget()/fput() 이다.
+
+
+|기능|설명|
+|----|----|
+|get_dma_buf()|참조 횟수에 1을 더함|
+|dma_buf_get()|참조 횟수에 1을 더하고, fd는 dma_buf 포인터로 변환됨|
+|dma_buf_put()|참조 횟수에서 1을 뻄|
+|dma_buf_fd()|참조 횟수는 변경되지 않고 fd만 생성함|
+
+앞서 언급하였듯이, 릴리스 콜백 인터페이슨느 dma-buf의 참조 횟수가 0으로 감소될 때만 트리거된다.
+그러므로,
+
+ * 사용중인 버퍼가 갑자기 해제되는 것을 원하지 않으면 미리 get() 해야 한다.
+ * kernel space에서 버퍼를 release 하고자 한다면, put()을 해야한다.
+ * user space에서 버퍼를 release 하고자 한다면, close() 해야한다.
+
+
+![alt text](images/file.png)

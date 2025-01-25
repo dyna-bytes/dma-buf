@@ -1,8 +1,17 @@
+#include <linux/platform_device.h>
+#include <linux/cdev.h>
+#include <linux/fs.h>
+#include <linux/uaccess.h>
 #include <linux/dma-buf.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <kunit/test.h>
 #include "importer.h"
+
+static struct platform_device *pdev;
+static struct cdev cdev;
+static dev_t dev_number;
+static struct class *dev_class;
 
 extern struct dma_buf *dmabuf_exported;
 
@@ -61,6 +70,23 @@ static int importer_test_vmap(struct dma_buf *dmabuf)
     return 0;
 }
 
+static long importer_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+	int fd;
+	struct dma_buf *dmabuf;
+
+	if (copy_from_user(&fd, (void __user *)arg, sizeof(int))) {
+		print_err("faild to get fd from user\n");
+        return -EINVAL;
+	}
+
+	dmabuf = dma_buf_get(fd);
+	importer_test_vmap(dmabuf);
+	dma_buf_put(dmabuf);
+
+	return 0;
+}
+
 static void kunit_importer_test_sg(struct kunit *test)
 {
 	KUNIT_EXPECT_EQ(test, importer_test_sg(dmabuf_exported), 0);
@@ -82,11 +108,78 @@ static struct kunit_suite kunit_importer_test_suite = {
 	.test_cases = kunit_importer_test_cases,
 };
 
+
+static struct file_operations importer_fops = {
+	.owner = THIS_MODULE,
+	.unlocked_ioctl = importer_ioctl,
+};
+
+static int importer_device_init(void)
+{
+	int ret;
+	pdev = platform_device_alloc(DEVICE_IMPORTER_NAME, -1);
+    if (!pdev) {
+        ret = -ENOMEM;
+        print_err("failed to allocate platform device(%d)\n", ret);
+        goto err;
+    }
+
+    ret = platform_device_add(pdev);
+    if (ret) {
+        print_err("failed to add platform device(%d)\n", ret);
+        goto err2;
+    }
+    print_info("Platform device created successfully\n");
+
+    ret = alloc_chrdev_region(&dev_number, 0, 1, DEVICE_IMPORTER_NAME);
+    if (ret) {
+        print_err("failed to allocate character device region(%d)\n", ret);
+        goto err2;
+    }
+
+    cdev_init(&cdev, &importer_fops);
+    cdev.owner = THIS_MODULE;
+
+    ret = cdev_add(&cdev, dev_number, 1);
+    if (ret) {
+        print_err("filed to add character device\n");
+        goto err3;
+    }
+    print_info("Kernel module inserted successfully. Major = %d Minor = %d\n",
+        MAJOR(dev_number), MINOR(dev_number));
+
+    dev_class = class_create(THIS_MODULE, CLASS_IMPORTER_NAME);
+    if (IS_ERR(dev_class)) {
+        ret = PTR_ERR(dev_class);
+        print_err("Failed to create device class(%d)\n", ret);
+        goto err4;
+    }
+
+    if (device_create(dev_class, NULL, dev_number, NULL, DEVICE_IMPORTER_NAME) == NULL) {
+        ret = -ENODEV;
+        print_err("Failed to create device(%d)\n", ret);
+        goto err5;
+    }
+
+	return 0;
+err5:
+    class_destroy(dev_class);
+err4:
+    cdev_del(&cdev);
+err3:
+    unregister_chrdev_region(dev_number, 1);
+err2:
+    platform_device_put(pdev);
+err:
+    return ret;
+}
+
 static int __init importer_init(void)
 {
 	int ret;
 
 	print_info("start\n");
+	importer_device_init();
 
 	ret = kunit_run_tests(&kunit_importer_test_suite);
 	if (ret)
